@@ -18,6 +18,9 @@ button#save{width:100%;border:0;background:none;color:var(--blue);font:inherit;p
 ul{list-style:none;margin:0;padding:0}li{display:flex;align-items:center;gap:10px;padding:10px 8px 10px 16px;border-bottom:.5px solid var(--sep)}li:last-child{border-bottom:0}
 .info{flex:1;min-width:0}.nm{font-weight:600;overflow:hidden;text-overflow:ellipsis}.sub{font-size:12px;color:var(--sub)}.pp{font-weight:700}
 .del{border:0;background:var(--red);color:#fff;border-radius:50%;width:28px;height:28px;font-size:13px}.empty{color:var(--sub);font-style:italic}
+.seg{display:flex;background:rgba(118,118,128,.12);border-radius:9px;padding:2px;margin:0 0 8px}.seg button{flex:1;border:0;background:none;color:var(--tx);font:500 13px -apple-system,system-ui,sans-serif;padding:6px 4px;border-radius:7px;cursor:pointer}
+.seg button.on{background:var(--card);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.15)}.seg i{font-style:normal;font-size:9px;margin-left:4px;color:var(--blue)}
+@media(prefers-color-scheme:dark){.seg{background:rgba(118,118,128,.24)}.seg button.on{background:#636366}.seg i{color:#fff}}
 </style></head><body>
 <h1>Liquor Ounce Tracker</h1>
 <h2>Liquor Details</h2><div class="card">
@@ -30,5 +33,5 @@ ul{list-style:none;margin:0;padding:0}li{display:flex;align-items:center;gap:10p
 <h2>&nbsp;</h2><div class="card">
 <div class="row"><b>Cost Per Ounce:</b><span class="sp"></span><span id="ppo" class="big">$0.00 / oz</span></div>
 <div class="row"><button id="save" disabled>⊕ Save to Price Log</button></div></div>
-<h2>Saved Price Log</h2><div class="card"><ul id="log"></ul></div>
+<h2>Saved Price Log</h2><div class="seg" id="sort" role="group" aria-label="Sort log"><button data-k="name">Name<i></i></button><button data-k="size">Size<i></i></button><button data-k="ppo">$/oz<i></i></button></div><div class="card"><ul id="log"></ul></div>
 <script src="logic.js"></script><script src="app.js"></script></body></html>
