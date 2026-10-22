@@ -39,4 +39,4 @@ $('#shMerge').addEventListener('click',()=>{if(!pending)return;const m=mergeItem
 $('#shReplace').addEventListener('click',()=>{if(!pending)return;const p=pending;if(items.length&&!confirm(`Replace your ${items.length} logged items with the backup? This can't be undone.`))return;
  items=p.items;store();if(p.sortPref){sort=p.sortPref;localStorage.setItem('sortPref',JSON.stringify(sort));renderSort()}render();closeSheet();toast(`Restored ${items.length} item${items.length===1?'':'s'}`)});
 update();renderSort();render();
-if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update());let rl=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(rl)return;rl=true;location.reload()});}
