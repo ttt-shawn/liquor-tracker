@@ -19,5 +19,24 @@ $('#log').addEventListener('click',e=>{const b=e.target.closest('.del');if(!b)re
  if(it&&confirm(`Delete "${it.name}"?`)){items=items.filter(i=>i.id!==it.id);store();render()}});
 $('#save').addEventListener('click',()=>{if(!canSave(name.value,price.value,ml()))return;items.push(makeItem(name.value,price.value,ml()));store();render();name.value=price.value=custom.value='';update()});
 [name,price,size,custom].forEach(el=>el.addEventListener('input',update));
+let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3500)}
+$('#bkBtn').addEventListener('click',async()=>{if(!items.length){toast('Nothing to back up yet');return}
+ const fn=backupFilename(),json=JSON.stringify(makeBackup(items,sort),null,2);
+ try{const f=new File([json],fn,{type:'application/json'});
+  if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Liquor Tracker backup'});toast(`Backed up ${items.length} item${items.length===1?'':'s'}`);return}}
+ catch(e){if(e&&e.name==='AbortError')return}
+ const u=URL.createObjectURL(new Blob([json],{type:'application/json'})),l=document.createElement('a');l.href=u;l.download=fn;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),10000);toast(`Backed up ${items.length} item${items.length===1?'':'s'}`)});
+$('#rsBtn').addEventListener('click',()=>$('#rsFile').click());
+let pending=null;const sheet=$('#sheet');
+$('#rsFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+ if(f.size>BACKUP_MAX_BYTES){alert("That file is too big to be a Liquor Tracker backup (2 MB max).");return}
+ let txt;try{txt=await f.text()}catch{alert("That file couldn't be read.");return}
+ const r=parseBackup(txt);if(!r.ok){alert(r.error);return}
+ pending=r;const n=r.items.length;$('#sheetMsg').textContent=`This backup has ${n} item${n===1?'':'s'}. Merge them into your current log (${items.length}), or replace your log with the backup?`;
+ $('#shReplace').textContent=items.length?'Replace':'Restore';$('#shMerge').hidden=!items.length;sheet.hidden=false});
+const closeSheet=()=>{sheet.hidden=true;pending=null};$('#shCancel').addEventListener('click',closeSheet);sheet.addEventListener('click',e=>{if(e.target===sheet)closeSheet()});
+$('#shMerge').addEventListener('click',()=>{if(!pending)return;const m=mergeItems(items,pending.items);items=m.items;store();render();closeSheet();toast(`Restored ${m.added} item${m.added===1?'':'s'}`+(m.skipped?` (${m.skipped} already here)`:''))});
+$('#shReplace').addEventListener('click',()=>{if(!pending)return;const p=pending;if(items.length&&!confirm(`Replace your ${items.length} logged items with the backup? This can't be undone.`))return;
+ items=p.items;store();if(p.sortPref){sort=p.sortPref;localStorage.setItem('sortPref',JSON.stringify(sort));renderSort()}render();closeSheet();toast(`Restored ${items.length} item${items.length===1?'':'s'}`)});
 update();renderSort();render();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
