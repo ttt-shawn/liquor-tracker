@@ -1,7 +1,8 @@
 // Single source of truth for the app version. Every release: bump APP_VERSION
 // and add a CHANGELOG entry at the TOP. See VERSIONING.md.
-var APP_VERSION = '1.3.1';
+var APP_VERSION = '1.4.0';
 var CHANGELOG = [
+ {version:'1.4.0', date:'2026-10-21', changes:['Version number shown at the bottom of the screen','What\'s New page with the full change log (tap the version)','One-time "Updated" note after each update']},
  {version:'1.3.1', date:'2026-10-21', changes:['Updates now load right away when you open the app (network-first offline cache)','Saved offline copy is only used when you have no signal']},
  {version:'1.3.0', date:'2026-10-21', changes:['Back Up to File: saves your log as a .json file via the share sheet (or Downloads)','Restore from File with Merge (skips duplicates) or Replace','Backup files are checked before loading, so a bad file can\'t wreck your log','New FAQ entries for backup and restore']},
  {version:'1.2.0', date:'2026-10-21', changes:['FAQ: tap the blue ? in the top right','Includes questions emailed in by users']},
