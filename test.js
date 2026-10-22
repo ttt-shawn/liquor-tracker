@@ -20,3 +20,8 @@ r=L.parseBackup(B([{name:'<img src=x onerror=alert(1)>',price:1,sizeMl:1}]));a.o
 r=L.parseBackup(B([{id:'x1',name:'J',price:30,sizeMl:750},{name:'New',price:10,sizeMl:50}]));a.ok(r.ok&&r.items[1].id);
 const m=L.mergeItems([{id:'x1',name:'J',price:30,sizeMl:750}],r.items);a.strictEqual(m.items.length,2);a.strictEqual(m.added,1);a.strictEqual(m.skipped,1);
 console.log('logic ok')
+// version.js consistency
+{const V=require('./version.js'),sem=/^\d+\.\d+\.\d+$/;a.ok(sem.test(V.APP_VERSION));a.strictEqual(V.CHANGELOG[0].version,V.APP_VERSION);
+const k=v=>v.split('.').map(Number),cmp=(x,y)=>{x=k(x);y=k(y);for(let i=0;i<3;i++)if(x[i]!==y[i])return x[i]-y[i];return 0};
+V.CHANGELOG.forEach((r,i)=>{a.ok(sem.test(r.version));a.ok(/^\d{4}-\d{2}-\d{2}$/.test(r.date));a.ok(r.changes.length);if(i)a.ok(cmp(V.CHANGELOG[i-1].version,r.version)>0)});
+const sw=require('fs').readFileSync(__dirname+'/sw.js','utf8');a.ok(sw.includes("'liquor-'+APP_VERSION")&&sw.includes("'version.js'"));console.log('version ok',V.APP_VERSION)}
