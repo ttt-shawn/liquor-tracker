@@ -45,6 +45,22 @@ a.strictEqual(L.parseBackup(JSON.stringify({app:'liquor-tracker',version:1,items
 // merge: id-based; same bottle at another store (different id) is kept; same id fills in a missing store
 const mg=L.mergeItems([{id:'1',name:'J',price:30,sizeMl:750},{id:'2',name:'J',price:25,sizeMl:750,store:'A'}],[{id:'1',name:'J',price:30,sizeMl:750,store:'Class IV'},{id:'2',name:'J',price:25,sizeMl:750,store:'B'},{id:'9',name:'J',price:30,sizeMl:750,store:'B'}]);
 a.strictEqual(mg.items.length,3);a.strictEqual(mg.added,1);a.strictEqual(mg.skipped,2);a.strictEqual(mg.items[0].store,'Class IV');a.strictEqual(mg.items[1].store,'A');a.strictEqual(mg.items[2].store,'B');
+// edit (v1.6.0)
+{const base=[{id:'a',name:'Jamesn',price:30,sizeMl:750},{id:'b',name:'Crown',price:22,sizeMl:750,store:'Class IV'},{id:'c',name:'Tito',price:20,sizeMl:1750,store:'Bob\'s'}],snap=JSON.stringify(base),now=new Date(Date.UTC(2026,9,22,5));
+ let u=L.updateItem(base,'a',' Jameson ','28.5',1000,'  class   iv ',now);a.ok(u.ok);a.strictEqual(JSON.stringify(base),snap,'no mutation');
+ a.strictEqual(u.items.length,3);a.strictEqual(u.items[0].id,'a');a.strictEqual(u.item.name,'Jameson');a.strictEqual(u.item.price,28.5);a.strictEqual(u.item.sizeMl,1000);
+ a.strictEqual(u.item.store,'Class IV','old entry gets store, matched to existing spelling');a.strictEqual(u.item.updatedAt,'2026-10-22T05:00:00.000Z');a.strictEqual(u.items[1],base[1]);
+ a.strictEqual(L.pricePerOz(u.item.price,u.item.sizeMl).toFixed(2),'0.84');
+ a.deepStrictEqual(L.listStores(u.items),['Bob\'s','Class IV']);a.strictEqual(ids(L.filterByStore(u.items,'Class IV')),'a,b');a.strictEqual(ids(L.sortItems(u.items,'ppo','asc')),'c,a,b');
+ u=L.updateItem(base,'b','Crown',22,750,'',now);a.ok(u.ok);a.ok(!('store' in u.item),'clearing store removes it');a.strictEqual(ids(L.filterByStore(u.items,'Class IV')),'');a.strictEqual(L.validFilter(u.items,'Class IV'),'');
+ u=L.updateItem(base,'b','Crown',22,750,'CLASS IV',now);a.strictEqual(u.item.store,'CLASS IV','own spelling can be re-cased when no other entry uses it');
+ for(const bad of [['a','',30,750],['a','J','',750],['a','J',30,0],['a','J','abc',750],['zzz','J',30,750]]){const r=L.updateItem(base,...bad,'',now);a.ok(!r.ok,bad.join());a.strictEqual(r.items,base)}
+ // backup keeps updatedAt; junk updatedAt dropped; old entries w/o updatedAt fine
+ u=L.updateItem(base,'a','Jameson',30,750,'X',now);const rb=L.parseBackup(JSON.stringify(L.makeBackup(u.items,null,now)));a.ok(rb.ok);a.strictEqual(rb.items[0].updatedAt,'2026-10-22T05:00:00.000Z');a.ok(!('updatedAt' in rb.items[1]));
+ const rj=L.parseBackup(B([{name:'a',price:1,sizeMl:1,updatedAt:'yesterday'},{name:'b',price:1,sizeMl:1,updatedAt:5}]));a.ok(rj.ok);a.ok(!('updatedAt' in rj.items[0]));a.ok(!('updatedAt' in rj.items[1]));
+ a.ok(!('updatedAt' in L.makeBackup([{id:'q',name:'q',price:1,sizeMl:1,updatedAt:'<script>'}],null,now).items[0]));
+ // merge after edit: same id is a duplicate (local edit wins)
+ const mm=L.mergeItems(u.items,base);a.strictEqual(mm.added,0);a.strictEqual(mm.items[0].store,'X');}
 console.log('logic ok')
 // version.js consistency
 {const V=require('./version.js'),sem=/^\d+\.\d+\.\d+$/;a.ok(sem.test(V.APP_VERSION));a.strictEqual(V.CHANGELOG[0].version,V.APP_VERSION);

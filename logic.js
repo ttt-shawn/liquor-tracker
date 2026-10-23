@@ -16,8 +16,14 @@ function sortItems(list,key,dir){const m=dir==='desc'?-1:1,byName=(a,b)=>String(
   store:(a,b)=>{const x=normStore(a.store),y=normStore(b.store);if(!x!==!y)return (!x?1:-1)*m;return x.localeCompare(y,undefined,{sensitivity:'base'})||pricePerOz(a.price,a.sizeMl)-pricePerOz(b.price,b.sizeMl)}}[key]||((a,b)=>pricePerOz(a.price,a.sizeMl)-pricePerOz(b.price,b.sizeMl));
  return [...list].sort((a,b)=>m*prim(a,b)||byName(a,b))}
 const BACKUP_MAX_ITEMS=5000,BACKUP_MAX_BYTES=2*1024*1024;
+// Edit an entry in place: same id and position, same validation as adding. Store is matched against the OTHER entries' spelling.
+// Returns {ok:false} if invalid or not found. Sets updatedAt (ISO) on the edited entry.
+function updateItem(list,id,name,price,ml,store,now){const k=list.findIndex(i=>i&&i.id===id);if(k<0||!canSave(name,price,ml))return {ok:false,items:list};
+ const others=list.filter((_,j)=>j!==k),s=canonStore(others,store),it={...list[k],name:String(name).trim(),price:Number(price),sizeMl:Number(ml),updatedAt:(now||new Date()).toISOString()};
+ if(s)it.store=s;else delete it.store;const out=list.slice();out[k]=it;return {ok:true,items:out,item:it}}
+const ISO_RE=/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/;
 const SORT_KEYS=['name','size','ppo','store'];
-function makeBackup(items,sortPref,now,storeFilter){now=now||new Date();const b={app:'liquor-tracker',version:1,exportedAt:now.toISOString(),sortPref:sortPref||null,items:items.map(i=>{const o={id:i.id,name:i.name,price:i.price,sizeMl:i.sizeMl},s=normStore(i.store);if(s)o.store=s;return o})};if(storeFilter)b.storeFilter=storeFilter;return b}
+function makeBackup(items,sortPref,now,storeFilter){now=now||new Date();const b={app:'liquor-tracker',version:1,exportedAt:now.toISOString(),sortPref:sortPref||null,items:items.map(i=>{const o={id:i.id,name:i.name,price:i.price,sizeMl:i.sizeMl},s=normStore(i.store);if(s)o.store=s;if(typeof i.updatedAt==='string'&&ISO_RE.test(i.updatedAt))o.updatedAt=i.updatedAt;return o})};if(storeFilter)b.storeFilter=storeFilter;return b}
 function backupFilename(now){now=now||new Date();const p=n=>String(n).padStart(2,'0');return `liquor-tracker-backup-${now.getFullYear()}-${p(now.getMonth()+1)}-${p(now.getDate())}.json`}
 function parseBackup(text){const bad=m=>({ok:false,error:m});
  if(typeof text!=='string')return bad("That file couldn't be read.");
@@ -34,7 +40,7 @@ function parseBackup(text){const bad=m=>({ok:false,error:m});
   if(!Number.isFinite(price)||price<0)return bad(`"${i.name.trim().slice(0,40)}" has a bad price.`);
   if(!Number.isFinite(ml)||ml<=0)return bad(`"${i.name.trim().slice(0,40)}" has a bad bottle size.`);
   const id=typeof i.id==='string'&&i.id.trim()&&i.id.length<=100?i.id:makeId();
-  const o={id,name:i.name.trim().slice(0,200),price,sizeMl:ml},st=normStore(i.store);if(st)o.store=st;out.push(o)}
+  const o={id,name:i.name.trim().slice(0,200),price,sizeMl:ml},st=normStore(i.store);if(st)o.store=st;if(typeof i.updatedAt==='string'&&ISO_RE.test(i.updatedAt))o.updatedAt=i.updatedAt;out.push(o)}
  let sp=null;const s=d.sortPref;if(s&&SORT_KEYS.includes(s.key)&&['asc','desc'].includes(s.dir))sp={key:s.key,dir:s.dir};
  const sf=d.storeFilter===NO_STORE?NO_STORE:normStore(d.storeFilter);
  return {ok:true,items:out,sortPref:sp,storeFilter:sf}}
@@ -43,4 +49,4 @@ function parseBackup(text){const bad=m=>({ok:false,error:m});
 function mergeItems(cur,inc){const byId=new Map(cur.map(i=>[i.id,i])),out=cur.map(i=>i),add=[];let skipped=0;
  for(const i of inc){const ex=byId.get(i.id);if(ex){skipped++;if(!normStore(ex.store)&&normStore(i.store))out[out.indexOf(ex)]={...ex,store:normStore(i.store)};continue}byId.set(i.id,i);add.push(i)}
  return {items:[...out,...add],added:add.length,skipped}}
-if(typeof module!=='undefined')module.exports={normStore,listStores,canonStore,filterByStore,validFilter,NO_STORE,SORT_KEYS,toOz,pricePerOz,makeItem,canSave,sortItems,ML_TO_OZ,makeBackup,backupFilename,parseBackup,mergeItems,BACKUP_MAX_ITEMS};
+if(typeof module!=='undefined')module.exports={updateItem,normStore,listStores,canonStore,filterByStore,validFilter,NO_STORE,SORT_KEYS,toOz,pricePerOz,makeItem,canSave,sortItems,ML_TO_OZ,makeBackup,backupFilename,parseBackup,mergeItems,BACKUP_MAX_ITEMS};
