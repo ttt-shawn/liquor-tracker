@@ -19,6 +19,32 @@ a.ok(!L.parseBackup(undefined).ok);a.ok(L.parseBackup(B([{name:'a',price:0,sizeM
 r=L.parseBackup(B([{name:'<img src=x onerror=alert(1)>',price:1,sizeMl:1}]));a.ok(r.ok);a.ok(r.items[0].id);
 r=L.parseBackup(B([{id:'x1',name:'J',price:30,sizeMl:750},{name:'New',price:10,sizeMl:50}]));a.ok(r.ok&&r.items[1].id);
 const m=L.mergeItems([{id:'x1',name:'J',price:30,sizeMl:750}],r.items);a.strictEqual(m.items.length,2);a.strictEqual(m.added,1);a.strictEqual(m.skipped,1);
+// store handling (v1.5.0)
+a.strictEqual(L.normStore('  Class   IV \n'),'Class IV');a.strictEqual(L.normStore(undefined),'');a.strictEqual(L.normStore(42),'');a.strictEqual(L.normStore('x'.repeat(200)).length,80);
+let s1=L.makeItem('J',30,750,'  Class  IV ');a.strictEqual(s1.store,'Class IV');a.ok(!('store' in L.makeItem('J',30,750)));a.ok(!('store' in L.makeItem('J',30,750,'   ')));
+const st=[{id:'1',name:'J',price:30,sizeMl:750,store:'Class IV'},{id:'2',name:'J',price:25,sizeMl:750,store:'Bob\'s Liquor'},{id:'3',name:'K',price:40,sizeMl:750},{id:'4',name:'M',price:20,sizeMl:750,store:'class iv'},{id:'5',name:'N',price:50,sizeMl:1750,store:''}];
+a.deepStrictEqual(L.listStores(st),['Bob\'s Liquor','Class IV']);a.deepStrictEqual(L.listStores([]),[]);
+a.strictEqual(L.canonStore(st,' CLASS iv '),'Class IV');a.strictEqual(L.canonStore(st,'New Place'),'New Place');a.strictEqual(L.canonStore(st,'  '),'');
+const ids=x=>x.map(i=>i.id).join();
+a.strictEqual(ids(L.filterByStore(st,'')),'1,2,3,4,5');a.strictEqual(ids(L.filterByStore(st,'CLASS IV')),'1,4');a.strictEqual(ids(L.filterByStore(st,L.NO_STORE)),'3,5');a.strictEqual(ids(L.filterByStore(st,'Nowhere')),'');
+a.strictEqual(L.validFilter(st,'class IV'),'Class IV');a.strictEqual(L.validFilter(st,'Gone'),'');a.strictEqual(L.validFilter(st,L.NO_STORE),L.NO_STORE);a.strictEqual(L.validFilter(st.slice(0,2),L.NO_STORE),'');
+// filter + sort compose
+a.strictEqual(ids(L.sortItems(L.filterByStore(st,'Class IV'),'ppo','asc')),'4,1');a.strictEqual(ids(L.sortItems(L.filterByStore(st,'Class IV'),'ppo','desc')),'1,4');
+// store sort: alphabetical, $/oz within store, no-store last in both directions
+a.strictEqual(ids(L.sortItems(st,'store','asc')),'2,4,1,5,3');a.strictEqual(ids(L.sortItems(st,'store','desc')).slice(0,5),'1,4,2');a.ok(/[35],[35]$/.test(ids(L.sortItems(st,'store','desc'))));
+// backup round-trip with store
+const bk2=L.makeBackup(st,{key:'store',dir:'asc'},new Date(2026,9,22),'Class IV');a.strictEqual(bk2.items[0].store,'Class IV');a.ok(!('store' in bk2.items[2]));a.ok(!('store' in bk2.items[4]));a.strictEqual(bk2.storeFilter,'Class IV');
+let r2=L.parseBackup(JSON.stringify(bk2));a.ok(r2.ok);a.strictEqual(r2.items[1].store,'Bob\'s Liquor');a.ok(!('store' in r2.items[2]));a.deepStrictEqual(r2.sortPref,{key:'store',dir:'asc'});a.strictEqual(r2.storeFilter,'Class IV');
+a.ok(!('storeFilter' in L.makeBackup(st,null,new Date())));
+// old backups (no store, no storeFilter) still load
+r2=L.parseBackup(B([{id:'o1',name:'Old',price:10,sizeMl:750}]));a.ok(r2.ok);a.ok(!('store' in r2.items[0]));a.strictEqual(r2.storeFilter,'');
+// bad store values are dropped, not fatal
+r2=L.parseBackup(B([{name:'a',price:1,sizeMl:1,store:123},{name:'b',price:1,sizeMl:1,store:null},{name:'c',price:1,sizeMl:1,store:'  Spaced   Out  '},{name:'d',price:1,sizeMl:1,store:'<b>x</b>'}]));
+a.ok(r2.ok);a.ok(!('store' in r2.items[0]));a.ok(!('store' in r2.items[1]));a.strictEqual(r2.items[2].store,'Spaced Out');a.strictEqual(r2.items[3].store,'<b>x</b>');
+a.strictEqual(L.parseBackup(JSON.stringify({app:'liquor-tracker',version:1,items:[],storeFilter:L.NO_STORE})).storeFilter,L.NO_STORE);
+// merge: id-based; same bottle at another store (different id) is kept; same id fills in a missing store
+const mg=L.mergeItems([{id:'1',name:'J',price:30,sizeMl:750},{id:'2',name:'J',price:25,sizeMl:750,store:'A'}],[{id:'1',name:'J',price:30,sizeMl:750,store:'Class IV'},{id:'2',name:'J',price:25,sizeMl:750,store:'B'},{id:'9',name:'J',price:30,sizeMl:750,store:'B'}]);
+a.strictEqual(mg.items.length,3);a.strictEqual(mg.added,1);a.strictEqual(mg.skipped,2);a.strictEqual(mg.items[0].store,'Class IV');a.strictEqual(mg.items[1].store,'A');a.strictEqual(mg.items[2].store,'B');
 console.log('logic ok')
 // version.js consistency
 {const V=require('./version.js'),sem=/^\d+\.\d+\.\d+$/;a.ok(sem.test(V.APP_VERSION));a.strictEqual(V.CHANGELOG[0].version,V.APP_VERSION);

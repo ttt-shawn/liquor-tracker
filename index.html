@@ -17,6 +17,7 @@ input,select{flex:1;border:0;background:none;color:var(--tx);font:inherit;paddin
 button#save{width:100%;border:0;background:none;color:var(--blue);font:inherit;padding:12px;cursor:pointer}button#save:disabled{color:var(--sub);opacity:.6}
 ul{list-style:none;margin:0;padding:0}li{display:flex;align-items:center;gap:10px;padding:10px 8px 10px 16px;border-bottom:.5px solid var(--sep)}li:last-child{border-bottom:0}
 .info{flex:1;min-width:0}.nm{font-weight:600;overflow:hidden;text-overflow:ellipsis}.sub{font-size:12px;color:var(--sub)}.pp{font-weight:700}
+.st{font-size:13px;color:var(--blue);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fcard{margin:0 0 8px}.fc{font-size:13px}#storeFilter{max-width:65%;text-overflow:ellipsis}
 .del{border:0;background:var(--red);color:#fff;border-radius:50%;width:28px;height:28px;font-size:13px}.empty{color:var(--sub);font-style:italic}
 .seg{display:flex;background:rgba(118,118,128,.12);border-radius:9px;padding:2px;margin:0 0 8px}.seg button{flex:1;border:0;background:none;color:var(--tx);font:500 13px -apple-system,system-ui,sans-serif;padding:6px 4px;border-radius:7px;cursor:pointer}
 .seg button.on{background:var(--card);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.15)}.seg i{font-style:normal;font-size:9px;margin-left:4px;color:var(--blue)}
@@ -30,6 +31,7 @@ ul{list-style:none;margin:0;padding:0}li{display:flex;align-items:center;gap:10p
 <h1>Liquor Ounce Tracker</h1>
 <h2>Liquor Details</h2><div class="card">
 <div class="row"><input id="name" placeholder="Item Name (e.g., Jameson)" autocomplete="off"></div>
+<div class="row"><span aria-hidden="true">🏪</span><input id="store" list="storeList" placeholder="Store (optional, e.g., Class IV)" autocomplete="off" autocapitalize="words" maxlength="80" aria-label="Store"><datalist id="storeList"></datalist></div>
 <div class="row"><span>$</span><input id="price" inputmode="decimal" placeholder="Total Price"></div></div>
 <h2>Bottle Size</h2><div class="card">
 <div class="row"><span>Size Preset</span><select id="size"><option value="50">50 ml (Nip)</option><option value="375">375 ml (Half)</option><option value="750" selected>750 ml (Fifth)</option><option value="1000">1.0 L (Quart)</option><option value="1750">1.75 L (Handle)</option><option value="0">Custom (ml)</option></select></div>
@@ -38,7 +40,9 @@ ul{list-style:none;margin:0;padding:0}li{display:flex;align-items:center;gap:10p
 <h2>&nbsp;</h2><div class="card">
 <div class="row"><b>Cost Per Ounce:</b><span class="sp"></span><span id="ppo" class="big">$0.00 / oz</span></div>
 <div class="row"><button id="save" disabled>⊕ Save to Price Log</button></div></div>
-<h2>Saved Price Log</h2><div class="seg" id="sort" role="group" aria-label="Sort log"><button data-k="name">Name<i></i></button><button data-k="size">Size<i></i></button><button data-k="ppo">$/oz<i></i></button></div><div class="card"><ul id="log"></ul></div>
+<h2>Saved Price Log</h2><div class="seg" id="sort" role="group" aria-label="Sort log"><button data-k="name">Name<i></i></button><button data-k="size">Size<i></i></button><button data-k="store">Store<i></i></button><button data-k="ppo">$/oz<i></i></button></div>
+<div class="card fcard" id="filterCard" hidden><div class="row"><span>Store</span><span id="filterCount" class="muted fc"></span><select id="storeFilter" aria-label="Filter by store"></select></div></div>
+<div class="card"><ul id="log"></ul></div>
 <h2>Backup &amp; Restore</h2><div class="card">
 <div class="row" style="padding:0"><button class="bk" id="bkBtn">⤴︎ Back Up to File</button></div>
 <div class="row" style="padding:0"><button class="bk" id="rsBtn">⤵︎ Restore from File</button></div></div>
