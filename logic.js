@@ -49,4 +49,52 @@ function parseBackup(text){const bad=m=>({ok:false,error:m});
 function mergeItems(cur,inc){const byId=new Map(cur.map(i=>[i.id,i])),out=cur.map(i=>i),add=[];let skipped=0;
  for(const i of inc){const ex=byId.get(i.id);if(ex){skipped++;if(!normStore(ex.store)&&normStore(i.store))out[out.indexOf(ex)]={...ex,store:normStore(i.store)};continue}byId.set(i.id,i);add.push(i)}
  return {items:[...out,...add],added:add.length,skipped}}
-if(typeof module!=='undefined')module.exports={updateItem,normStore,listStores,canonStore,filterByStore,validFilter,NO_STORE,SORT_KEYS,toOz,pricePerOz,makeItem,canSave,sortItems,ML_TO_OZ,makeBackup,backupFilename,parseBackup,mergeItems,BACKUP_MAX_ITEMS};
+// ---- CSV (v1.7.0): open spreadsheet format. JSON backup stays the full-fidelity backup. ----
+const CSV_COLS=['id','name','sizeMl','price','pricePerOz','store','updatedAt'];
+const CSV_BOM='\uFEFF';
+function csvCell(v){let s=v==null?'':String(v);if(/^[=+\-@\t\r]/.test(s)&&!/^-?\d/.test(s))s="'"+s;return /[",\r\n]/.test(s)||s!==s.trim()?'"'+s.replace(/"/g,'""')+'"':s}
+function makeCSV(items){const rows=[CSV_COLS.join(',')];for(const i of items){const up=typeof i.updatedAt==='string'&&ISO_RE.test(i.updatedAt)?i.updatedAt:'';
+ rows.push([i.id,i.name,i.sizeMl,Number(i.price).toFixed(2),pricePerOz(i.price,i.sizeMl).toFixed(2),normStore(i.store),up].map(csvCell).join(','))}
+ return CSV_BOM+rows.join('\r\n')+'\r\n'}
+function csvFilename(now){return backupFilename(now).replace('-backup-','-').replace(/\.json$/,'.csv')}
+// RFC 4180 tokenizer: quoted fields, "" escapes, CRLF/LF/CR, embedded newlines. Returns array of rows (arrays of strings).
+function parseCSVRows(t){const rows=[];let row=[],f='',q=false,i=0;const n=t.length;
+ while(i<n){const c=t[i];if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i+=2;continue}q=false;i++;continue}f+=c;i++;continue}
+  if(c==='"'&&f.trim()===''){q=true;f='';i++;continue}
+  if(c===','){row.push(f);f='';i++;continue}
+  if(c==='\r'||c==='\n'){row.push(f);rows.push(row);row=[];f='';i+=(c==='\r'&&t[i+1]==='\n')?2:1;continue}
+  f+=c;i++}
+ if(f!==''||row.length){row.push(f);rows.push(row)}return rows}
+const CSV_ALIAS={id:'id',name:'name',bottle:'name',liquor:'name',sizeml:'sizeMl',size:'sizeMl',ml:'sizeMl','size(ml)':'sizeMl',price:'price',totalprice:'price',store:'store',updatedat:'updatedAt',updated:'updatedAt',priceperoz:'ppo','$/oz':'ppo'};
+const hkey=h=>String(h).replace(/^\uFEFF/,'').toLowerCase().replace(/[\s_]/g,'');
+function csvNum(s){s=String(s==null?'':s).trim().replace(/^\((.*)\)$/,'-$1').replace(/[$\s,]/g,'').replace(/ml$/i,'');if(!/^-?(\d+\.?\d*|\.\d+)$/.test(s))return NaN;return Number(s)}
+const unq=s=>{s=String(s==null?'':s).trim();return /^'[=+\-@]/.test(s)?s.slice(1):s};
+function parseCSV(text){const bad=m=>({ok:false,error:m});
+ if(typeof text!=='string')return bad("That file couldn't be read.");
+ if(text.length>BACKUP_MAX_BYTES)return bad("That file is too big (2 MB max).");
+ text=text.replace(/^\uFEFF/,'');if(/^\s*[\[{]/.test(text))return bad("That looks like a .json backup. Use Restore from File for those.");
+ const rows=parseCSVRows(text).filter(r=>r.some(c=>c.trim()!==''));if(!rows.length)return bad("That spreadsheet is empty.");
+ const head=rows[0].map(h=>CSV_ALIAS[hkey(h)]||null),col={};head.forEach((k,j)=>{if(k&&!(k in col))col[k]=j});
+ const miss=['name','price','sizeMl'].filter(k=>!(k in col));if(miss.length)return bad(`That spreadsheet is missing the ${miss.map(k=>k==='sizeMl'?'sizeMl (bottle size in ml)':k).join(', ')} column${miss.length>1?'s':''}. Export one from the app to see the layout.`);
+ if(rows.length-1>BACKUP_MAX_ITEMS)return bad(`That spreadsheet has too many rows (max ${BACKUP_MAX_ITEMS}).`);
+ const out=[],skipped=[],seen=new Set();const g=(r,k)=>k in col?(r[col[k]]==null?'':r[col[k]]):'';
+ for(let k=1;k<rows.length;k++){const r=rows[k],line=k+1,nm=unq(g(r,'name')).replace(/\s+/g,' ').slice(0,200),lab=nm?`"${nm.slice(0,40)}"`:`Row ${line}`;
+  if(!nm){skipped.push(`Row ${line}: no name`);continue}
+  const price=csvNum(g(r,'price')),ml=csvNum(g(r,'sizeMl'));
+  if(!Number.isFinite(price)||price<0){skipped.push(`${lab} (row ${line}): bad price`);continue}
+  if(!Number.isFinite(ml)||ml<=0){skipped.push(`${lab} (row ${line}): bad size`);continue}
+  let id=String(g(r,'id')).trim();if(!id||id.length>100||seen.has(id))id='';if(id)seen.add(id);
+  const o={id,name:nm,price,sizeMl:ml},st=normStore(unq(g(r,'store')));if(st)o.store=st;const up=String(g(r,'updatedAt')).trim();if(ISO_RE.test(up))o.updatedAt=up;out.push(o)}
+ if(!out.length)return {ok:false,error:`No usable rows in that spreadsheet (${skipped.length} skipped).`+(skipped.length?'\n'+skipped.slice(0,5).join('\n'):''),skipped};
+ return {ok:true,items:out,skipped}}
+// Rows with no id or an id not in `cur` become new entries with fresh ids; matching ids are updated if anything changed.
+function mergeCSV(cur,inc,now){const ts=(now||new Date()).toISOString(),idx=new Map(cur.map((i,k)=>[i.id,k])),out=cur.slice(),add=[];let updated=0,same=0;
+ for(const i of inc){const k=i.id?idx.get(i.id):undefined;
+  if(k===undefined){const n={...i,id:makeId()};delete n.updatedAt;if(i.updatedAt)n.updatedAt=i.updatedAt;add.push(n);continue}
+  const ex=out[k],st=canonStore(out.filter((_,j)=>j!==k),i.store);
+  if(ex.name===i.name&&ex.price===i.price&&ex.sizeMl===i.sizeMl&&normStore(ex.store)===st){same++;continue}
+  const n={...ex,name:i.name,price:i.price,sizeMl:i.sizeMl,updatedAt:ts};if(st)n.store=st;else delete n.store;out[k]=n;updated++}
+ return {items:[...out,...add],added:add.length,updated,unchanged:same}}
+// Overwrite: every row kept; missing ids get fresh ones.
+function replaceFromCSV(inc){return inc.map(i=>i.id?{...i}:{...i,id:makeId()})}
+if(typeof module!=='undefined')module.exports={CSV_COLS,makeCSV,csvFilename,parseCSVRows,parseCSV,mergeCSV,replaceFromCSV,csvNum,updateItem,normStore,listStores,canonStore,filterByStore,validFilter,NO_STORE,SORT_KEYS,toOz,pricePerOz,makeItem,canSave,sortItems,ML_TO_OZ,makeBackup,backupFilename,parseBackup,mergeItems,BACKUP_MAX_ITEMS};

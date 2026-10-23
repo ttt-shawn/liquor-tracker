@@ -52,7 +52,12 @@ li.editing{background:rgba(0,122,255,.10)}.editbar{position:sticky;top:env(safe-
 <h2>Backup &amp; Restore</h2><div class="card">
 <div class="row" style="padding:0"><button class="bk" id="bkBtn">⤴︎ Back Up to File</button></div>
 <div class="row" style="padding:0"><button class="bk" id="rsBtn">⤵︎ Restore from File</button></div></div>
-<p class="note">Saves your log as a small .json file. Keep it in Files or iCloud Drive in case you lose the app.</p>
+<p class="note">Saves your log as a small .json file. Keep it in Files or iCloud Drive in case you lose the app. This is the recommended full backup.</p>
+<h2>Spreadsheet (CSV)</h2><div class="card">
+<div class="row" style="padding:0"><button class="bk" id="csvExBtn">⤴︎ Export to Spreadsheet (.csv)</button></div>
+<div class="row" style="padding:0"><button class="bk" id="csvImBtn">⤵︎ Import from Spreadsheet (.csv)</button></div></div>
+<p class="note">Opens in Excel, Numbers, or Google Sheets. Edit it, then import it back. Keep the id column so edited bottles update instead of duplicating; $/oz is recalculated on import.</p>
+<input type="file" id="csvFile" accept=".csv,text/csv,text/comma-separated-values,text/plain" hidden>
 <input type="file" id="rsFile" accept=".json,application/json" hidden>
 <div id="sheet" hidden><div class="box"><div class="card"><p id="sheetMsg"></p><button id="shMerge">Merge</button><button id="shReplace" class="red">Replace</button></div><div class="card"><button id="shCancel" class="cx">Cancel</button></div></div></div>
 <div id="toast" hidden role="status"></div>

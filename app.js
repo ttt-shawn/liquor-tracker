@@ -52,16 +52,35 @@ $('#bkBtn').addEventListener('click',async()=>{if(!items.length){toast('Nothing 
  catch(e){if(e&&e.name==='AbortError')return}
  const u=URL.createObjectURL(new Blob([json],{type:'application/json'})),l=document.createElement('a');l.href=u;l.download=fn;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),10000);toast(`Backed up ${items.length} item${items.length===1?'':'s'}`)});
 $('#rsBtn').addEventListener('click',()=>$('#rsFile').click());
+async function shareOrDownload(data,fn,type,title){try{const f=new File([data],fn,{type});
+  if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title});return true}}
+ catch(e){if(e&&e.name==='AbortError')return false}
+ const u=URL.createObjectURL(new Blob([data],{type})),l=document.createElement('a');l.href=u;l.download=fn;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),10000);return true}
+$('#csvExBtn').addEventListener('click',async()=>{if(!items.length){toast('Nothing to export yet');return}
+ if(await shareOrDownload(makeCSV(items),csvFilename(),'text/csv','Liquor Tracker spreadsheet'))toast(`Exported ${items.length} item${items.length===1?'':'s'} to CSV`)});
+$('#csvImBtn').addEventListener('click',()=>$('#csvFile').click());
+$('#csvFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+ if(f.size>BACKUP_MAX_BYTES){alert("That file is too big (2 MB max).");return}
+ let txt;try{txt=await f.text()}catch{alert("That file couldn't be read.");return}
+ const r=parseCSV(txt);if(!r.ok){alert(r.error);return}
+ pending={csv:true,items:r.items,skipped:r.skipped};const n=r.items.length,sk=r.skipped.length;
+ $('#sheetMsg').textContent=`This spreadsheet has ${n} good row${n===1?'':'s'}`+(sk?` (${sk} bad row${sk===1?'':'s'} will be skipped)`:'')+`. Merge adds new bottles and updates changed ones in your log (${items.length}). Overwrite replaces your whole log with the spreadsheet.`;
+ $('#shReplace').textContent=items.length?'Overwrite':'Import';$('#shMerge').hidden=!items.length;$('#toast').hidden=true;sheet.hidden=false});
+const skipNote=p=>p.skipped&&p.skipped.length?`, ${p.skipped.length} skipped (${p.skipped.slice(0,3).join('; ')}${p.skipped.length>3?'; …':''})`:'';
 let pending=null;const sheet=$('#sheet');
 $('#rsFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
  if(f.size>BACKUP_MAX_BYTES){alert("That file is too big to be a Liquor Tracker backup (2 MB max).");return}
  let txt;try{txt=await f.text()}catch{alert("That file couldn't be read.");return}
  const r=parseBackup(txt);if(!r.ok){alert(r.error);return}
  pending=r;const n=r.items.length;$('#sheetMsg').textContent=`This backup has ${n} item${n===1?'':'s'}. Merge them into your current log (${items.length}), or replace your log with the backup?`;
- $('#shReplace').textContent=items.length?'Replace':'Restore';$('#shMerge').hidden=!items.length;sheet.hidden=false});
+ $('#shReplace').textContent=items.length?'Replace':'Restore';$('#shMerge').hidden=!items.length;$('#toast').hidden=true;sheet.hidden=false});
 const closeSheet=()=>{sheet.hidden=true;pending=null};$('#shCancel').addEventListener('click',closeSheet);sheet.addEventListener('click',e=>{if(e.target===sheet)closeSheet()});
-$('#shMerge').addEventListener('click',()=>{if(!pending)return;if(editId){draft=null;endEdit()}const m=mergeItems(items,pending.items);items=m.items;store();render();closeSheet();toast(`Restored ${m.added} item${m.added===1?'':'s'}`+(m.skipped?` (${m.skipped} already here)`:''))});
-$('#shReplace').addEventListener('click',()=>{if(!pending)return;const p=pending;if(items.length&&!confirm(`Replace your ${items.length} logged items with the backup? This can't be undone.`))return;if(editId){draft=null;endEdit()}
+$('#shMerge').addEventListener('click',()=>{if(!pending)return;if(editId){draft=null;endEdit()}
+ if(pending.csv){const p=pending,m=mergeCSV(items,p.items);items=m.items;store();render();closeSheet();toast(`${m.added} imported, ${m.updated} updated`+(m.unchanged?`, ${m.unchanged} unchanged`:'')+skipNote(p));return}
+ const m=mergeItems(items,pending.items);items=m.items;store();render();closeSheet();toast(`Restored ${m.added} item${m.added===1?'':'s'}`+(m.skipped?` (${m.skipped} already here)`:''))});
+$('#shReplace').addEventListener('click',()=>{if(!pending)return;const p=pending;if(items.length&&!confirm(`Replace your ${items.length} logged items with the ${p.csv?'spreadsheet':'backup'}? This can't be undone.`))return;if(editId){draft=null;endEdit()}
+ if(p.csv){items=replaceFromCSV(p.items);store();render();closeSheet();toast(`${items.length} imported (log overwritten)`+skipNote(p));return}
+ 
  items=p.items;store();if(p.sortPref){sort=p.sortPref;localStorage.setItem('sortPref',JSON.stringify(sort));renderSort()}setStoreF(p.storeFilter||'');render();closeSheet();toast(`Restored ${items.length} item${items.length===1?'':'s'}`)});
 update();renderSort();render();
 if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update());let rl=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(rl)return;rl=true;location.reload()});}

@@ -63,6 +63,35 @@ a.strictEqual(mg.items.length,3);a.strictEqual(mg.added,1);a.strictEqual(mg.skip
  const mm=L.mergeItems(u.items,base);a.strictEqual(mm.added,0);a.strictEqual(mm.items[0].store,'X');}
 console.log('logic ok')
 // version.js consistency
+// CSV (v1.7.0)
+{const src=[{id:'a1',name:'Jim "Beam", Jr',price:30,sizeMl:750,store:'Bob\'s, Inc',updatedAt:'2026-10-22T05:00:00.000Z'},{id:'a2',name:'Plain',price:1234.5,sizeMl:1750},{id:'a3',name:'=SUM(A1)',price:0,sizeMl:50,store:'Café Ünï'}];
+ const c=L.makeCSV(src);a.ok(c.startsWith('\uFEFFid,name,sizeMl,price,pricePerOz,store,updatedAt\r\n'));a.ok(c.includes('"Jim ""Beam"", Jr"'));a.ok(c.includes("'=SUM(A1)"));
+ let r=L.parseCSV(c);a.ok(r.ok,r.error);a.strictEqual(r.items.length,3);a.strictEqual(r.skipped.length,0);
+ for(let k=0;k<3;k++){const x=r.items[k],y=src[k];a.strictEqual(x.id,y.id);a.strictEqual(x.name,y.name.replace(/\s+/g,' '));a.strictEqual(x.price,y.price);a.strictEqual(x.sizeMl,y.sizeMl);a.strictEqual(x.store,y.store);a.strictEqual(x.updatedAt,y.updatedAt)}
+ // round trip into same log: nothing changes
+ let m=L.mergeCSV(src,r.items);a.strictEqual(m.added,0);a.strictEqual(m.updated,0);
+ // reordered header, LF only, Excel-formatted numbers, $/oz lies, aliases, blank lines, bad rows
+ const x='\uFEFFStore,Price,$/oz,Name,Size (ml),ID\n"Class IV","$1,299.00",999,Big Bottle,"1,750",a2\n,$20,1,New One,750,\n\n,10,1,,750,\nBad,abc,1,Nope,750,\nBad2,5,1,Zero,0,zz\n,$22.50,1,Unknown Id,375,ghost\n';
+ r=L.parseCSV(x);a.ok(r.ok);a.strictEqual(r.items.length,3);a.strictEqual(r.skipped.length,3);a.ok(/no name/.test(r.skipped[0])&&/bad price/.test(r.skipped[1])&&/bad size/.test(r.skipped[2]));
+ a.strictEqual(r.items[0].price,1299);a.strictEqual(r.items[0].sizeMl,1750);a.strictEqual(r.items[0].store,'Class IV');a.ok(!('ppo' in r.items[0]));
+ const now=new Date(Date.UTC(2026,9,23,12));m=L.mergeCSV(src,r.items,now);a.strictEqual(m.added,2);a.strictEqual(m.updated,1);a.strictEqual(m.items.length,5);
+ a.strictEqual(m.items[1].id,'a2');a.strictEqual(m.items[1].price,1299);a.strictEqual(m.items[1].updatedAt,now.toISOString());a.strictEqual(m.items[0].updatedAt,src[0].updatedAt);
+ a.ok(m.items[3].id&&m.items[3].id!=='ghost'&&m.items[4].id!=='ghost');a.strictEqual(L.pricePerOz(m.items[1].price,m.items[1].sizeMl).toFixed(2),'21.95');
+ a.strictEqual(src[1].price,1234.5,'no mutation');
+ // overwrite gives every row an id
+ const ov=L.replaceFromCSV(r.items);a.strictEqual(ov.length,3);a.ok(ov.every(i=>i.id));
+ // CRLF, quoted CRLF inside field, store cleared via merge
+ r=L.parseCSV('id,name,sizeMl,price,store\r\na1,"Line1\r\nLine2",750,30,\r\n');a.ok(r.ok);a.strictEqual(r.items[0].name,'Line1 Line2');m=L.mergeCSV(src,r.items,now);a.strictEqual(m.updated,1);a.ok(!('store' in m.items[0]));
+ // duplicate ids in file: second becomes new
+ r=L.parseCSV('id,name,sizeMl,price\na1,A,750,1\na1,B,750,2\n');a.strictEqual(r.items[1].id,'');
+ // errors
+ for(const b of ['','\uFEFF','name,price\nA,1',JSON.stringify({app:'liquor-tracker'}),'name,price,sizeMl\n,1,750'])a.ok(!L.parseCSV(b).ok,JSON.stringify(b));a.ok(!L.parseCSV(undefined).ok);
+ a.strictEqual(L.csvNum(' $1,234.50 '),1234.5);a.ok(Number.isNaN(L.csvNum('')));a.ok(Number.isNaN(L.csvNum('1.2.3')));a.strictEqual(L.csvNum('750ml'),750);
+ a.strictEqual(L.csvFilename(new Date(2026,0,5)),'liquor-tracker-2026-01-05.csv');
+ // bad updatedAt (Excel-reformatted) dropped
+ r=L.parseCSV('id,name,sizeMl,price,updatedAt\nq,A,750,1,10/22/2026 5:00\n');a.ok(!('updatedAt' in r.items[0]));
+ console.log('csv ok')}
+
 {const V=require('./version.js'),sem=/^\d+\.\d+\.\d+$/;a.ok(sem.test(V.APP_VERSION));a.strictEqual(V.CHANGELOG[0].version,V.APP_VERSION);
 const k=v=>v.split('.').map(Number),cmp=(x,y)=>{x=k(x);y=k(y);for(let i=0;i<3;i++)if(x[i]!==y[i])return x[i]-y[i];return 0};
 V.CHANGELOG.forEach((r,i)=>{a.ok(sem.test(r.version));a.ok(/^\d{4}-\d{2}-\d{2}$/.test(r.date));a.ok(r.changes.length);if(i)a.ok(cmp(V.CHANGELOG[i-1].version,r.version)>0)});

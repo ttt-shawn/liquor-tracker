@@ -20,7 +20,8 @@ var FAQ = [
  {q:"How do I suggest a feature or report a bug?", a:"Email <a href=\"mailto:spackbot+liquorbot@mail.grokbot.com?subject=Liquor%20Tracker%20idea\">spackbot+liquorbot@mail.grokbot.com</a>. Ideas, bugs, and insults all welcome. Some of these answers came from questions sent there."},
  {q:"Does a bot read my emails and make the changes, or does Shawn do it by hand?", a:"A bit of both. A bot reads your emails and summarizes them, <b>Shawn decides</b> what gets built, and then the bot writes the code. Robot labor, human management. The way nature intended."},
  {q:"Will this make my liquor cheaper?", a:"Sadly, no. It'll just make you <i>smug</i> about how cheap it was. It may also reveal that the handle was the better deal all along. It usually is."},
- {q:"Is this app affiliated with any store or brand?", a:"Nope. No ads, no sponsors, no tracking. Just math."}
+ {q:"Is this app affiliated with any store or brand?", a:"Nope. No ads, no sponsors, no tracking. Just math."},
+ {q:"Spreadsheet (CSV) or Backup: which should I use?", a:"<b>Back Up to File (.json)</b> is the full, exact backup. Use it to keep your log safe or move it to a new phone.<br><b>Export to Spreadsheet (.csv)</b> is for opening your log in Excel, Numbers, or Google Sheets: sort it, fix things, add rows, then <b>Import from Spreadsheet</b> to bring it back. You'll be asked to <b>Merge</b> (add new rows, update changed ones) or <b>Overwrite</b> (replace everything).<br>Tips: keep the <b>id</b> column so edited bottles update instead of duplicating; leave id blank on new rows. Size is in ml. The $/oz column is ignored and recalculated. Bad rows are skipped and you'll be told which."}
 ];
 (function(){
   var css=document.createElement('style');css.textContent=
