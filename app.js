@@ -1,6 +1,6 @@
 const $=s=>document.querySelector(s),KEY='savedLiquors';
 let items=[];try{items=JSON.parse(localStorage.getItem(KEY))||[]}catch{items=[]}
-items=items.map(i=>i.id?i:{...i,id:makeItem('',0,0).id});
+items=items.map(i=>i.id?i:{...i,id:makeId()}).map(withCreated);
 let sort={key:'ppo',dir:'asc'};try{const v=JSON.parse(localStorage.getItem('sortPref'));if(v&&SORT_KEYS.includes(v.key)&&['asc','desc'].includes(v.dir))sort=v}catch{}
 const store=()=>localStorage.setItem(KEY,JSON.stringify(items));store();
 let storeF='';try{storeF=localStorage.getItem('storeFilter')||''}catch{}
@@ -12,10 +12,11 @@ function update(){crow.hidden=size.value!=='0';const oz=toOz(ml());
  $('#volRow').hidden=!(oz>0);$('#vol').textContent=oz.toFixed(2)+' fl oz';
  $('#ppo').textContent='$'+pricePerOz(price.value,ml()).toFixed(2)+' / oz';
  $('#save').disabled=!canSave(name.value,price.value,ml());}
+const when=v=>{const t=Date.parse(v);if(!v||isNaN(t))return '';const d=new Date(t),n=new Date(),o={month:'short',day:'numeric'};if(d.getFullYear()!==n.getFullYear())o.year='numeric';return d.toLocaleDateString(undefined,o)+', '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})};
 const esc=s=>s.replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
 function renderSort(){document.querySelectorAll('#sort button').forEach(b=>{const on=b.dataset.k===sort.key;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);b.querySelector('i').textContent=on?(sort.dir==='asc'?'▲':'▼'):''})}
 $('#sort').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.k;
- sort=k===sort.key?{key:k,dir:sort.dir==='asc'?'desc':'asc'}:{key:k,dir:'asc'};localStorage.setItem('sortPref',JSON.stringify(sort));renderSort();render()});
+ sort=k===sort.key?{key:k,dir:sort.dir==='asc'?'desc':'asc'}:{key:k,dir:k==='date'?'desc':'asc'};localStorage.setItem('sortPref',JSON.stringify(sort));renderSort();render()});
 function renderStores(){const st=listStores(items),hasNone=items.some(i=>!normStore(i.store));
  $('#storeList').innerHTML=st.map(s=>`<option value="${esc(s)}">`).join('');
  const v=validFilter(items,storeF);if(v!==storeF)setStoreF(v);
@@ -26,7 +27,7 @@ fsel.addEventListener('change',()=>{setStoreF(fsel.value);render()});
 function render(){renderStores();const L=$('#log'),cnt=$('#filterCount');if(!items.length){L.innerHTML='<li class="empty">No logged items yet</li>';cnt.textContent='';return}
  const shown=filterByStore(items,storeF);cnt.textContent=storeF?`${shown.length} of ${items.length}`:'';
  if(!shown.length){L.innerHTML='<li class="empty">Nothing logged for this store</li>';return}
- L.innerHTML=sortItems(shown,sort.key,sort.dir).map(i=>`<li${i.id===editId?' class="editing"':''}><div class="info"><div class="nm">${esc(i.name)}</div>${normStore(i.store)?`<div class="st">@ ${esc(normStore(i.store))}</div>`:''}<div class="sub">$${i.price.toFixed(2)} for ${i.sizeMl.toFixed(0)}ml (${toOz(i.sizeMl).toFixed(1)} oz)</div></div><div class="pp">$${pricePerOz(i.price,i.sizeMl).toFixed(2)}/oz</div><button class="ed" data-id="${i.id}" aria-label="Edit ${esc(i.name)}">✎</button><button class="del" data-id="${i.id}" aria-label="Delete ${esc(i.name)}">✕</button></li>`).join('')}
+ L.innerHTML=sortItems(shown,sort.key,sort.dir).map(i=>`<li${i.id===editId?' class="editing"':''}><div class="info"><div class="nm">${esc(i.name)}</div>${normStore(i.store)?`<div class="st">@ ${esc(normStore(i.store))}</div>`:''}<div class="sub">$${i.price.toFixed(2)} for ${i.sizeMl.toFixed(0)}ml (${toOz(i.sizeMl).toFixed(1)} oz)</div>${when(i.createdAt)||when(i.updatedAt)?`<div class="when">${when(i.createdAt)?esc(when(i.createdAt)):''}${when(i.updatedAt)?`<span class="edt">${when(i.createdAt)?' · ':''}edited ${esc(when(i.updatedAt))}</span>`:''}</div>`:''}</div><div class="pp">$${pricePerOz(i.price,i.sizeMl).toFixed(2)}/oz</div><button class="ed" data-id="${i.id}" aria-label="Edit ${esc(i.name)}">✎</button><button class="del" data-id="${i.id}" aria-label="Delete ${esc(i.name)}">✕</button></li>`).join('')}
 let editId=null,draft=null;const PRESETS=['50','375','750','1000','1750'];
 function setForm(f){name.value=f.name;price.value=f.price;storeIn.value=f.store;const m=String(f.ml);if(PRESETS.includes(m)){size.value=m;custom.value=''}else{size.value='0';custom.value=f.ml||''}update()}
 function getForm(){return {name:name.value,price:price.value,store:storeIn.value,ml:size.value==='0'?custom.value:size.value}}

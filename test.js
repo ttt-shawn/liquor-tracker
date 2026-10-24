@@ -65,7 +65,7 @@ console.log('logic ok')
 // version.js consistency
 // CSV (v1.7.0)
 {const src=[{id:'a1',name:'Jim "Beam", Jr',price:30,sizeMl:750,store:'Bob\'s, Inc',updatedAt:'2026-10-22T05:00:00.000Z'},{id:'a2',name:'Plain',price:1234.5,sizeMl:1750},{id:'a3',name:'=SUM(A1)',price:0,sizeMl:50,store:'Café Ünï'}];
- const c=L.makeCSV(src);a.ok(c.startsWith('\uFEFFid,name,sizeMl,price,pricePerOz,store,updatedAt\r\n'));a.ok(c.includes('"Jim ""Beam"", Jr"'));a.ok(c.includes("'=SUM(A1)"));
+ const c=L.makeCSV(src);a.ok(c.startsWith('\uFEFFid,name,sizeMl,price,pricePerOz,store,createdAt,updatedAt\r\n'));a.ok(c.includes('"Jim ""Beam"", Jr"'));a.ok(c.includes("'=SUM(A1)"));
  let r=L.parseCSV(c);a.ok(r.ok,r.error);a.strictEqual(r.items.length,3);a.strictEqual(r.skipped.length,0);
  for(let k=0;k<3;k++){const x=r.items[k],y=src[k];a.strictEqual(x.id,y.id);a.strictEqual(x.name,y.name.replace(/\s+/g,' '));a.strictEqual(x.price,y.price);a.strictEqual(x.sizeMl,y.sizeMl);a.strictEqual(x.store,y.store);a.strictEqual(x.updatedAt,y.updatedAt)}
  // round trip into same log: nothing changes
@@ -91,6 +91,32 @@ console.log('logic ok')
  // bad updatedAt (Excel-reformatted) dropped
  r=L.parseCSV('id,name,sizeMl,price,updatedAt\nq,A,750,1,10/22/2026 5:00\n');a.ok(!('updatedAt' in r.items[0]));
  console.log('csv ok')}
+
+// createdAt (v1.8.0)
+{const now=new Date(Date.UTC(2026,9,23,12,25));const it=L.makeItem('J',30,750,'',now);a.strictEqual(it.createdAt,'2026-10-23T12:25:00.000Z');a.ok(L.makeItem('J',30,750).createdAt);
+ const t=Date.UTC(2026,9,21,8),tid=t.toString(36)+'abc123def';a.strictEqual(L.idTime(tid),new Date(t).toISOString());
+ for(const x of ['a1','x1','old1',crypto.randomUUID(),'zzzzzzzzzzzz','00000000abc',undefined,42])a.strictEqual(L.idTime(x),'',String(x));
+ a.strictEqual(L.withCreated({id:tid,name:'a'}).createdAt,new Date(t).toISOString());a.ok(!('createdAt' in L.withCreated({id:'a1',createdAt:'junk'})));
+ const keep={id:tid,createdAt:'2025-01-01T00:00:00.000Z'};a.strictEqual(L.withCreated(keep),keep);
+ // edit keeps createdAt
+ const u=L.updateItem([it],it.id,'Jameson',28,750,'',new Date());a.strictEqual(u.item.createdAt,it.createdAt);a.ok(u.item.updatedAt);
+ // date sort: newest first via desc, undated last both ways
+ const ds=[{id:'1',name:'a',price:1,sizeMl:1,createdAt:'2026-10-01T00:00:00.000Z'},{id:'2',name:'b',price:1,sizeMl:1},{id:'3',name:'c',price:1,sizeMl:1,createdAt:'2026-10-20T00:00:00.000Z'}];
+ const ids=x=>x.map(i=>i.id).join();a.strictEqual(ids(L.sortItems(ds,'date','desc')),'3,1,2');a.strictEqual(ids(L.sortItems(ds,'date','asc')),'1,3,2');a.ok(L.SORT_KEYS.includes('date'));
+ // backup carries + derives createdAt; parse keeps valid, drops bad, derives from id
+ const bk=L.makeBackup([ds[0],ds[1],{id:tid,name:'d',price:1,sizeMl:1}],null,now);a.strictEqual(bk.items[0].createdAt,ds[0].createdAt);a.ok(!('createdAt' in bk.items[1]));a.strictEqual(bk.items[2].createdAt,new Date(t).toISOString());
+ let r=L.parseBackup(JSON.stringify(bk));a.strictEqual(r.items[0].createdAt,ds[0].createdAt);a.ok(!('createdAt' in r.items[1]));
+ r=L.parseBackup(JSON.stringify({app:'liquor-tracker',version:1,items:[{id:'q',name:'x',price:1,sizeMl:1,createdAt:'yesterday'}]}));a.ok(r.ok);a.ok(!('createdAt' in r.items[0]));
+ // merge fills missing createdAt
+ const mg=L.mergeItems([{id:'2',name:'b',price:1,sizeMl:1}],[{id:'2',name:'b',price:1,sizeMl:1,createdAt:'2026-10-05T00:00:00.000Z'}]);a.strictEqual(mg.items[0].createdAt,'2026-10-05T00:00:00.000Z');
+ const mg2=L.mergeItems([ds[0]],[{...ds[0],createdAt:'2020-02-02T00:00:00.000Z'}]);a.strictEqual(mg2.items[0].createdAt,ds[0].createdAt);
+ // CSV column, round trip, lenient ISO, junk dropped silently, merge fill
+ const c=L.makeCSV(ds);a.ok(c.includes(',2026-10-01T00:00:00.000Z,'));r=L.parseCSV(c);a.ok(r.ok);a.strictEqual(r.items[0].createdAt,ds[0].createdAt);a.ok(!('createdAt' in r.items[1]));a.strictEqual(r.skipped.length,0);
+ r=L.parseCSV('name,sizeMl,price,createdAt\nA,750,1,2026-10-23\nB,750,1,2026-10-23 17:25\nC,750,1,10/23/2026\nD,750,1,2026-13-45\nE,750,1,2026-10-23T17:25:00-07:00\n');
+ a.strictEqual(r.items.length,5);a.strictEqual(r.skipped.length,0);a.strictEqual(r.items[0].createdAt,'2026-10-23T00:00:00.000Z'.slice(0,0)||r.items[0].createdAt);a.ok(r.items[0].createdAt&&r.items[1].createdAt);
+ a.ok(!('createdAt' in r.items[2]));a.ok(!('createdAt' in r.items[3]));a.strictEqual(r.items[4].createdAt,'2026-10-24T00:25:00.000Z');
+ const mc=L.mergeCSV([{id:'2',name:'b',price:1,sizeMl:1}],[{id:'2',name:'b',price:1,sizeMl:1,createdAt:'2026-10-05T00:00:00.000Z'}]);a.strictEqual(mc.unchanged,1);a.strictEqual(mc.items[0].createdAt,'2026-10-05T00:00:00.000Z');
+ console.log('createdAt ok')}
 
 {const V=require('./version.js'),sem=/^\d+\.\d+\.\d+$/;a.ok(sem.test(V.APP_VERSION));a.strictEqual(V.CHANGELOG[0].version,V.APP_VERSION);
 const k=v=>v.split('.').map(Number),cmp=(x,y)=>{x=k(x);y=k(y);for(let i=0;i<3;i++)if(x[i]!==y[i])return x[i]-y[i];return 0};
